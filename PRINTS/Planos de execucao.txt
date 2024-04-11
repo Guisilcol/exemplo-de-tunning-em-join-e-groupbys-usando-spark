@@ -1,0 +1,80 @@
+
+-- broadcast_join_large_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- BroadcastHashJoin [id#2L], [city_weather_id#6L], Inner, BuildLeft, false
+   :- BroadcastExchange HashedRelationBroadcastMode(List(input[2, bigint, false]),false), [id=#21]
+   :  +- Filter isnotnull(id#2L)
+   :     +- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [isnotnull(id#2L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(id)], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- Filter isnotnull(city_weather_id#6L)
+      +- FileScan parquet default.city_tags[city_weather_id#6L,tag#7] Batched: true, DataFilters: [isnotnull(city_weather_id#6L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(city_weather_id)], ReadSchema: struct<city_weather_id:bigint,tag:string>
+
+-- broadcast_join_small_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- BroadcastHashJoin [city#0], [name#6], LeftOuter, BuildRight, false
+   :- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, string, false]),false), [id=#17]
+      +- Filter isnotnull(name#6)
+         +- FileScan parquet default.world_cities[name#6,country#7,subcountry#8] Batched: true, DataFilters: [isnotnull(name#6)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(name)], ReadSchema: struct<name:string,country:string,subcountry:string>
+
+-- shuffle_join_large_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- ShuffledHashJoin [id#2L], [city_weather_id#6L], Inner, BuildLeft
+   :- Exchange hashpartitioning(id#2L, 1000), ENSURE_REQUIREMENTS, [id=#22]
+   :  +- Filter isnotnull(id#2L)
+   :     +- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [isnotnull(id#2L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(id)], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- Exchange hashpartitioning(city_weather_id#6L, 1000), ENSURE_REQUIREMENTS, [id=#23]
+      +- Filter isnotnull(city_weather_id#6L)
+         +- FileScan parquet default.city_tags[city_weather_id#6L,tag#7] Batched: true, DataFilters: [isnotnull(city_weather_id#6L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(city_weather_id)], ReadSchema: struct<city_weather_id:bigint,tag:string>
+
+
+-- shuffle_join_small_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- ShuffledHashJoin [city#0], [name#6], LeftOuter, BuildRight
+   :- Exchange hashpartitioning(city#0, 1000), ENSURE_REQUIREMENTS, [id=#18]
+   :  +- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- Exchange hashpartitioning(name#6, 1000), ENSURE_REQUIREMENTS, [id=#19]
+      +- Filter isnotnull(name#6)
+         +- FileScan parquet default.world_cities[name#6,country#7,subcountry#8] Batched: true, DataFilters: [isnotnull(name#6)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(name)], ReadSchema: struct<name:string,country:string,subcountry:string>
+
+
+-- sort_merge_join_bucketed_table
+
+AdaptiveSparkPlan isFinalPlan=false
++- SortMergeJoin [id#2L], [city_weather_id#6L], Inner
+   :- Sort [id#2L ASC NULLS FIRST], false, 0
+   :  +- Filter isnotnull(id#2L)
+   :     +- FileScan parquet default.city_weathers_bucketed[city#0,temperature#1,id#2L] Batched: true, Bucketed: true, DataFilters: [isnotnull(id#2L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(id)], ReadSchema: struct<city:string,temperature:double,id:bigint>, SelectedBucketsCount: 12 out of 12
+   +- Sort [city_weather_id#6L ASC NULLS FIRST], false, 0
+      +- Filter isnotnull(city_weather_id#6L)
+         +- FileScan parquet default.city_tags_bucketed[city_weather_id#6L,tag#7] Batched: true, Bucketed: true, DataFilters: [isnotnull(city_weather_id#6L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(city_weather_id)], ReadSchema: struct<city_weather_id:bigint,tag:string>, SelectedBucketsCount: 12 out of 12
+
+
+-- sort_merge_join_large_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- SortMergeJoin [id#2L], [city_weather_id#6L], Inner
+   :- Sort [id#2L ASC NULLS FIRST], false, 0
+   :  +- Exchange hashpartitioning(id#2L, 1000), ENSURE_REQUIREMENTS, [id=#22]
+   :     +- Filter isnotnull(id#2L)
+   :        +- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [isnotnull(id#2L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(id)], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- Sort [city_weather_id#6L ASC NULLS FIRST], false, 0
+      +- Exchange hashpartitioning(city_weather_id#6L, 1000), ENSURE_REQUIREMENTS, [id=#23]
+         +- Filter isnotnull(city_weather_id#6L)
+            +- FileScan parquet default.city_tags[city_weather_id#6L,tag#7] Batched: true, DataFilters: [isnotnull(city_weather_id#6L)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(city_weather_id)], ReadSchema: struct<city_weather_id:bigint,tag:string>
+
+
+-- sort_merge_join_small_table.py
+
+AdaptiveSparkPlan isFinalPlan=false
++- SortMergeJoin [city#0], [name#6], LeftOuter
+   :- Sort [city#0 ASC NULLS FIRST], false, 0
+   :  +- Exchange hashpartitioning(city#0, 1000), ENSURE_REQUIREMENTS, [id=#18]
+   :     +- FileScan parquet default.city_weathers[city#0,temperature#1,id#2L] Batched: true, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<city:string,temperature:double,id:bigint>
+   +- Sort [name#6 ASC NULLS FIRST], false, 0
+      +- Exchange hashpartitioning(name#6, 1000), ENSURE_REQUIREMENTS, [id=#19]
+         +- Filter isnotnull(name#6)
+            +- FileScan parquet default.world_cities[name#6,country#7,subcountry#8] Batched: true, DataFilters: [isnotnull(name#6)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3://exemplo-de-spark-join-e-estrategias-de-melhoria-de-performance/da..., PartitionFilters: [], PushedFilters: [IsNotNull(name)], ReadSchema: struct<name:string,country:string,subcountry:string>
