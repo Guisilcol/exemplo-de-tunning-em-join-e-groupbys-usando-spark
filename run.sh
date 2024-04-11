@@ -1,0 +1,14 @@
+
+python3 src/broadcast_join/broadcast_join_small_table.py
+sync
+python3 src/shuffle_join/shuffle_join_small_table.py
+sync
+python3 src/sort_merge_join/sort_merge_join_small_table.py
+sync
+python3 src/broadcast_join/broadcast_join_large_table.py OOM ERROR
+sync
+python3 src/shuffle_join/shuffle_join_large_table.py
+sync
+python3 src/sort_merge_join/sort_merge_join_large_table.py
+sync 
+python3 src/sort_merge_join/sort_merge_join_bucketed_table.py
